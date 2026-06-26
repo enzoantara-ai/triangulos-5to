@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Juego: Triángulos — Wise House School</title>
+<style>
+  :root{ --blue:#1F4E79; --mid:#2E75B6; --green:#4C9A2A; --orange:#E07B39; --light:#EAF1F8; }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif}
+  body{background:linear-gradient(135deg,#e8f0fa,#f4f7fb);min-height:100vh;
+       display:flex;align-items:center;justify-content:center;padding:16px;color:#222}
+  .card{background:#fff;border-radius:22px;box-shadow:0 14px 40px rgba(31,78,121,.18);
+        width:100%;max-width:620px;overflow:hidden}
+  header{background:var(--blue);color:#fff;padding:22px 26px;text-align:center}
+  header h1{font-size:1.45rem;margin-bottom:4px}
+  header p{opacity:.85;font-size:.85rem;font-style:italic}
+  .bar{display:flex;justify-content:space-between;align-items:center;
+       padding:12px 26px;background:var(--light);font-size:.9rem;font-weight:600;color:var(--blue)}
+  .body{padding:26px}
+  .progress{height:8px;background:#e3e9f1;border-radius:8px;overflow:hidden;margin-bottom:18px}
+  .progress > div{height:100%;background:var(--green);width:0;transition:width .4s}
+  svg{display:block;margin:0 auto 16px;max-width:100%}
+  .q{font-size:1.18rem;font-weight:700;color:var(--blue);margin-bottom:6px;line-height:1.4}
+  .hint{font-size:.85rem;color:#777;margin-bottom:18px}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .opt{padding:15px 18px;border:2px solid #d6e0ee;border-radius:14px;background:#fff;
+       font-size:1.1rem;cursor:pointer;text-align:center;transition:.15s;font-weight:700;color:#333}
+  .opt:hover:not(:disabled){border-color:var(--mid);background:var(--light);transform:translateY(-2px)}
+  .opt:disabled{cursor:default}
+  .opt.correct{background:#e6f4e1;border-color:var(--green);color:var(--green)}
+  .opt.wrong{background:#fbe3da;border-color:var(--orange);color:var(--orange)}
+  .fb{margin-top:18px;padding:14px 16px;border-radius:12px;font-size:.95rem;display:none;line-height:1.5}
+  .fb.ok{background:#e6f4e1;color:#2e6b16;display:block}
+  .fb.no{background:#fdeee7;color:#a64a1a;display:block}
+  .btn{margin-top:20px;width:100%;padding:15px;border:none;border-radius:14px;
+       background:var(--blue);color:#fff;font-size:1.05rem;font-weight:700;cursor:pointer;transition:.15s}
+  .btn:hover{background:#163b5c}
+  .btn.hidden{display:none}
+  .end{text-align:center;padding:14px 0}
+  .score-big{font-size:3.2rem;font-weight:800;color:var(--blue)}
+  .emoji{font-size:3rem;margin-bottom:10px}
+  .msg{font-size:1.1rem;color:#444;margin:10px 0 20px}
+  footer{text-align:center;font-size:.75rem;color:#999;padding:14px}
+</style>
+</head>
+<body>
+<div class="card">
+  <header>
+    <h1>📐 Triángulos y sus ángulos</h1>
+    <p>Wise House School · 5to de Primaria</p>
+  </header>
+  <div class="bar">
+    <span id="counter">Pregunta 1 / 10</span>
+    <span id="score">Puntos: 0</span>
+  </div>
+  <div class="body">
+    <div class="progress"><div id="pbar"></div></div>
+    <div id="game">
+      <div id="figure"></div>
+      <div class="q" id="question"></div>
+      <div class="hint" id="hint"></div>
+      <div class="opts" id="opts"></div>
+      <div class="fb" id="fb"></div>
+      <button class="btn hidden" id="next">Siguiente →</button>
+    </div>
+  </div>
+  <footer>Practica cuantas veces quieras · Profesor Enzo Antara</footer>
+</div>
+
+<script>
+// SVG helper: draws a triangle with labels at the 3 vertices
+function triSVG(pts, labels, right){
+  const [A,B,C]=pts;
+  let sq='';
+  if(right){ // small right-angle square at vertex C (assumed bottom-left)
+    sq=`<rect x="${C[0]}" y="${C[1]-16}" width="16" height="16" fill="none" stroke="#1F4E79" stroke-width="2"/>`;
+  }
+  const lbl=(p,t,dx,dy)=>`<text x="${p[0]+dx}" y="${p[1]+dy}" font-size="17" font-weight="bold" fill="#1F4E79">${t}</text>`;
+  return `<svg viewBox="0 0 320 180" width="320" height="180">
+    <polygon points="${A[0]},${A[1]} ${B[0]},${B[1]} ${C[0]},${C[1]}"
+      fill="#F2DCE8" stroke="#1F4E79" stroke-width="2.5"/>
+    ${sq}
+    ${lbl(A,labels[0],-6,-8)}${lbl(B,labels[1],4,-8)}${lbl(C,labels[2],-6,22)}
+  </svg>`;
+}
+
+const QUESTIONS = [
+  {fig:triSVG([[160,20],[280,150],[40,150]], ["?","45°","100°"], false),
+   q:"¿Cuánto mide el ángulo x?", hint:"Los 3 ángulos suman 180°",
+   o:["35°","45°","55°","145°"], a:0,
+   e:"x = 180° − 100° − 45° = 35°."},
+  {fig:triSVG([[160,20],[280,150],[40,150]], ["75°","?","90°"], true),
+   q:"Triángulo rectángulo. ¿Cuánto mide x?", hint:"Los 2 ángulos agudos suman 90°",
+   o:["15°","25°","105°","90°"], a:0,
+   e:"En el rectángulo: x = 90° − 75° = 15°."},
+  {fig:triSVG([[160,20],[280,150],[40,150]], ["60°","70°","?"], false),
+   q:"¿Cuánto mide el ángulo x?", hint:"Los 3 ángulos suman 180°",
+   o:["40°","50°","60°","130°"], a:1,
+   e:"x = 180° − 60° − 70° = 50°."},
+  {fig:null,
+   q:"¿Cuánto suman SIEMPRE los 3 ángulos internos de cualquier triángulo?", hint:"Propiedad fundamental",
+   o:["90°","180°","270°","360°"], a:1,
+   e:"En todo triángulo los ángulos internos suman 180°."},
+  {fig:null,
+   q:"En un triángulo rectángulo, ¿cuánto suman los dos ángulos agudos?", hint:"Sin contar el ángulo de 90°",
+   o:["45°","60°","90°","180°"], a:2,
+   e:"Los dos agudos suman 90°, porque 90° + 90° = 180°."},
+  {fig:triSVG([[160,20],[280,150],[40,150]], ["?","70°","90°"], true),
+   q:"Triángulo rectángulo. ¿Cuánto mide x?", hint:"x = 90° − el otro agudo",
+   o:["10°","20°","30°","110°"], a:1,
+   e:"x = 90° − 70° = 20°."},
+  {fig:null,
+   q:"¿Cuánto suman los TRES ángulos externos de un triángulo?", hint:"Propiedad de los ángulos externos",
+   o:["180°","270°","360°","90°"], a:2,
+   e:"Los ángulos externos de cualquier triángulo suman 360°."},
+  {fig:null,
+   q:"Un ángulo externo mide igual que…", hint:"Propiedad del ángulo externo",
+   o:["los 3 ángulos internos","la suma de los 2 internos NO adyacentes","el ángulo recto","la mitad de 180°"], a:1,
+   e:"El ángulo externo = suma de los dos ángulos internos no adyacentes a él."},
+  {fig:null,
+   q:"Un ángulo externo tiene internos no adyacentes de 50° y 65°. ¿Cuánto mide el ángulo externo?", hint:"x = a + b",
+   o:["100°","115°","130°","65°"], a:1,
+   e:"x = 50° + 65° = 115°."},
+  {fig:null,
+   q:"¿Cuántos lados y cuántas diagonales tiene un triángulo?", hint:"Recuerda la definición",
+   o:["3 lados y 3 diagonales","3 lados y 0 diagonales","4 lados y 2 diagonales","3 lados y 1 diagonal"], a:1,
+   e:"El triángulo tiene 3 lados y NO tiene diagonales."},
+];
+
+let idx=0, score=0, answered=false;
+const $=id=>document.getElementById(id);
+
+function render(){
+  answered=false;
+  const item=QUESTIONS[idx];
+  $('counter').textContent=`Pregunta ${idx+1} / ${QUESTIONS.length}`;
+  $('score').textContent=`Puntos: ${score}`;
+  $('pbar').style.width=`${(idx/QUESTIONS.length)*100}%`;
+  $('figure').innerHTML=item.fig || '';
+  $('question').textContent=item.q;
+  $('hint').textContent=item.hint || "Elige una opción";
+  $('fb').className='fb'; $('fb').textContent='';
+  $('next').classList.add('hidden');
+  $('next').textContent = idx===QUESTIONS.length-1 ? "Ver resultado 🎉" : "Siguiente →";
+  const box=$('opts'); box.innerHTML='';
+  item.o.forEach((txt,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.textContent=txt;
+    b.onclick=()=>choose(i,b);
+    box.appendChild(b);
+  });
+}
+function choose(i,btn){
+  if(answered) return;
+  answered=true;
+  const item=QUESTIONS[idx];
+  document.querySelectorAll('.opt').forEach(o=>o.disabled=true);
+  const all=document.querySelectorAll('.opt');
+  if(i===item.a){
+    btn.classList.add('correct'); score++;
+    $('fb').className='fb ok'; $('fb').innerHTML="✅ ¡Correcto! "+item.e;
+  } else {
+    btn.classList.add('wrong'); all[item.a].classList.add('correct');
+    $('fb').className='fb no'; $('fb').innerHTML="❌ Casi. "+item.e;
+  }
+  $('score').textContent=`Puntos: ${score}`;
+  $('next').classList.remove('hidden');
+}
+$('next').onclick=()=>{ idx++; if(idx<QUESTIONS.length) render(); else showEnd(); };
+
+function showEnd(){
+  $('pbar').style.width='100%'; $('counter').textContent='Finalizado';
+  const pct=Math.round(score/QUESTIONS.length*100);
+  let emoji,msg;
+  if(pct===100){emoji='🏆';msg='¡Perfecto! Dominas los ángulos de los triángulos.';}
+  else if(pct>=70){emoji='🌟';msg='¡Muy bien! Casi lo tienes todo.';}
+  else if(pct>=50){emoji='👍';msg='Buen intento. Repasa las propiedades y vuelve a jugar.';}
+  else {emoji='💪';msg='Sigue practicando: recuerda que los ángulos internos suman 180°.';}
+  $('game').innerHTML=`<div class="end">
+      <div class="emoji">${emoji}</div>
+      <div class="score-big">${score}/${QUESTIONS.length}</div>
+      <div class="msg">${msg}</div>
+      <button class="btn" onclick="restart()">🔄 Jugar de nuevo</button></div>`;
+}
+function restart(){
+  idx=0;score=0;
+  $('game').innerHTML=`<div id="figure"></div>
+    <div class="q" id="question"></div>
+    <div class="hint" id="hint"></div>
+    <div class="opts" id="opts"></div>
+    <div class="fb" id="fb"></div>
+    <button class="btn hidden" id="next">Siguiente →</button>`;
+  $('next').onclick=()=>{idx++; if(idx<QUESTIONS.length) render(); else showEnd();};
+  render();
+}
+render();
+</script>
+</body>
+</html>
